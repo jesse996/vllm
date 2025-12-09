@@ -24,6 +24,7 @@ from vllm.model_executor.model_loader.weight_utils import (
 )
 from vllm.model_executor.models.llama import LlamaDecoderLayer, LlamaForCausalLM
 from vllm.multimodal.inputs import NestedTensors
+from vllm.model_executor.models.utils import _merge_multimodal_embeddings
 
 from .utils import (
     AutoWeightsLoader,
@@ -299,7 +300,21 @@ class Eagle3LlamaForCausalLM(LlamaForCausalLM):
         multimodal_embeddings: NestedTensors | None = None,
         is_multimodal: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        return self.model.embed_input_ids(input_ids)
+        # return self.model.embed_input_ids(input_ids)
+        return self.get_input_embeddings(input_ids, multimodal_embeddings)
+    
+    def get_input_embeddings(
+        self,
+        input_ids: torch.Tensor,
+        multimodal_embeddings: NestedTensors | None = None,
+    ) -> torch.Tensor:
+        input_embeds = self.model.embed_input_ids(input_ids)   
+        if multimodal_embeddings is not None:
+            input_embeds = _merge_multimodal_embeddings(
+                input_ids, input_embeds, multimodal_embeddings, 
+                getattr(self.config, "image_token_index", None),
+            )
+        return input_embeds
 
     def forward(
         self,
